@@ -139,10 +139,11 @@ def write_top_bar():
             provider = PROVIDER_MAP[selected_provider]
         else:
             provider = selected_provider.capitalize()
-        header = f"An AI App powered by Amazon Kendra and {provider}!"
+        #header = f"An AI App powered by Amazon Kendra and {provider}!"
+        header = f"Logios <br> Tu asistente de políticas y procedimientos"
         st.write(f"<h3 class='main-header'>{header}</h3>", unsafe_allow_html=True)
     with col3:
-        clear = st.button("Clear Chat")
+        clear = st.button("Nuevo Chat")
     return clear
 
 clear = write_top_bar()
@@ -169,6 +170,10 @@ def handle_input():
     chain = st.session_state['llm_app']
     result = chain.run_chain(llm_chain, input, chat_history)
     answer = result['answer']
+    
+    print("result:")
+    print(result)
+    
     chat_history.append((input, answer))
     
     document_list = []
@@ -232,4 +237,4 @@ with st.container():
     write_chat_message(a, q)
 
 st.markdown('---')
-input = st.text_input("You are talking to an AI, ask any question.", key="input", on_change=handle_input)
+input = st.text_input("Estás hablando con una IA, pregunta lo que necesites.", key="input", on_change=handle_input)

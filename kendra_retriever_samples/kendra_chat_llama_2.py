@@ -1,4 +1,5 @@
-from langchain.retrievers import AmazonKendraRetriever
+#from langchain.retrievers import AmazonKendraRetriever
+from langchain_community.retrievers.kendra import AmazonKendraRetriever
 from langchain.chains import ConversationalRetrievalChain
 from langchain.prompts import PromptTemplate
 from langchain.llms import SagemakerEndpoint
@@ -55,7 +56,7 @@ def build_chain():
     llm=SagemakerEndpoint(
           endpoint_name=endpoint_name, 
           region_name=region, 
-          model_kwargs={"max_new_tokens": 1500, "top_p": 0.8,"temperature":0.6},
+          model_kwargs={"max_new_tokens": 1500, "top_p": 0.6,"temperature":0.1, "return_full_text": False},
           endpoint_kwargs={"CustomAttributes":"accept_eula=true",
                            "InferenceComponentName":inference_component_name},
           content_handler=content_handler,
@@ -64,40 +65,79 @@ def build_chain():
     llm=SagemakerEndpoint(
           endpoint_name=endpoint_name, 
           region_name=region, 
-          model_kwargs={"max_new_tokens": 1500, "top_p": 0.8,"temperature":0.6},
+          model_kwargs={"max_new_tokens": 1500, "top_p": 0.6,"temperature":0.1, "return_full_text": False},
           endpoint_kwargs={"CustomAttributes":"accept_eula=true"},
           content_handler=content_handler,
 
     ) 
    
       
-  retriever = AmazonKendraRetriever(index_id=kendra_index_id,region_name=region)
+  retriever = AmazonKendraRetriever(index_id=kendra_index_id,region_name=region, attribute_filter = {
+            "EqualsTo": {      
+                "Key": "_language_code",
+                "Value": {
+                    "StringValue": "es"
+                    }
+                }})
 
+  #prompt_template = """
+  #<s>[INST] <<SYS>>
+  #The following is a friendly conversation between a human and an AI. 
+  #The AI is talkative and provides lots of specific details from its context.
+  #If the AI does not know the answer to a question, it truthfully says it 
+  #does not know.
+  #{context}
+  #<</SYS>>
+  #Instruction: Based on the above documents, provide a detailed answer for, {question} Answer "don't know" 
+  #if not present in the document. 
+  #Solution:
+  #[/INST]"""
+    
   prompt_template = """
   <s>[INST] <<SYS>>
-  The following is a friendly conversation between a human and an AI. 
-  The AI is talkative and provides lots of specific details from its context.
-  If the AI does not know the answer to a question, it truthfully says it 
-  does not know.
+  Busca las respuestas en el documento "Procedimiento gastos globales CIB - Abril 2024 -ES.pdf"
+  No te puedes inventar ninguna respuesta que no aparezca en esos documentos.
+  Si no tiene la respuesta exacta, haga preguntas hasta que obtenga la información necesaria.
+  Sólo si después de muchos intentos no encuentras la respuesta a la pregunta del usuario, sólo entonces, responde "No he encontrado la respuesta en el BBVA 
+  documentos que tengo, por favor, ¿puede reformularme la pregunta?"  
+  Siga siempre esta estructura: 
+  Primero, responda la pregunta claramente proporcionando los datos y cifras que responden a la pregunta. 
+  En segundo lugar, diga en qué procedimiento aparece la respuesta.
+  En tercer lugar, muestra el párrafo del que has extraído la respuesta con las mismas palabras que aparecen en el procedimiento,
+  Cuarto, guía al usuario a través de los pasos necesarios. 
+  No agregue información adicional de los documentos que no estén directamente relacionadas con la pregunta.
+  El tono debe ser cercano y profesional. 
+  Todas las respuestas deben ser un párrafo, evitando información no solicitada. 
+  Si no hay otra información, supone que la información es sólo para la persona que la solicita.
+  Si hay cifras, muestra las cifras.
+
   {context}
   <</SYS>>
-  Instruction: Based on the above documents, provide a detailed answer for, {question} Answer "don't know" 
-  if not present in the document. 
-  Solution:
+  Instrucción: según los documentos anteriores, proporcione una respuesta detallada a {question}. Contesta "no sé" 
+  si la información no está presente en el documento. 
+  Respuesta:
   [/INST]"""
+    
+    
+
   PROMPT = PromptTemplate(
       template=prompt_template, input_variables=["context", "question"],
   )
+
+    
   condense_qa_template = """
   <s>[INST] <<SYS>>
-  Given the following conversation and a follow up question, rephrase the follow up question 
-  to be a standalone question.
+  Dada la siguiente conversación y una pregunta de seguimiento, reformule la pregunta de seguimiento 
+  ser una pregunta independiente.
 
-  Chat History:
+  Historial de chat:
   {chat_history}
-  Follow Up Input: {question}
-    <</SYS>>
-  Standalone question:  [/INST]"""
+  Entrada de seguimiento: {question}
+  <</SYS>>
+  Pregunta completa: [/INST]"""
+
+    
+    
   standalone_question_prompt = PromptTemplate.from_template(condense_qa_template)
  
 
@@ -107,7 +147,7 @@ def build_chain():
         condense_question_prompt=standalone_question_prompt, 
         return_source_documents=True, 
         combine_docs_chain_kwargs={"prompt":PROMPT},
-        verbose=False
+        verbose=True
         )
   return qa
 
